@@ -1,17 +1,21 @@
 package com.example.xo;
 
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
@@ -33,6 +37,11 @@ public class GameActivity extends AppCompatActivity {
     private String[][] board = new String[3][3];
     private Button[][] buttons = new Button[3][3];
 
+    // Sound effects
+    private SoundPool soundPool;
+    private int winSoundId, loseSoundId, drawSoundId;
+    private boolean soundsLoaded = false;
+
     // PvE variables
     private boolean isPvE;
     private int difficulty; // 0: Easy, 1: Medium, 2: Hard
@@ -45,14 +54,18 @@ public class GameActivity extends AppCompatActivity {
     private TextView textPartiesNulles;
     private TextView textStatus;
     private Button btnToggleMusicGame;
+    private ImageView imageAvatarStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game);
-        
+
         // Allow volume control
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
+
+        // Setup sound effects
+        setupSounds();
 
         // Récupérer les données de l'intent
         Intent intent = getIntent();
@@ -70,6 +83,7 @@ public class GameActivity extends AppCompatActivity {
         textPartiesNulles = findViewById(R.id.text_parties_nulles);
         textStatus = findViewById(R.id.text_status);
         btnToggleMusicGame = findViewById(R.id.btn_toggle_music_game);
+        imageAvatarStatus = findViewById(R.id.image_avatar_status);
 
         initializeButtons();
         updateUI();
@@ -98,12 +112,37 @@ public class GameActivity extends AppCompatActivity {
         }
     }
 
+    private void setupSounds() {
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
+        soundPool = new SoundPool.Builder()
+                .setMaxStreams(3)
+                .setAudioAttributes(audioAttributes)
+                .build();
+
+        soundPool.setOnLoadCompleteListener((soundPool, sampleId, status) -> {
+            if (status == 0) {
+                soundsLoaded = true;
+            } else {
+                Toast.makeText(GameActivity.this, "Erreur chargement des sons", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        winSoundId = soundPool.load(this, R.raw.win_sound, 1);
+        loseSoundId = soundPool.load(this, R.raw.lose_sound, 1);
+        drawSoundId = soundPool.load(this, R.raw.draw_sound, 1);
+    }
+
     private void initializeButtons() {
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 String buttonID = "button_" + i + j;
                 int resID = getResources().getIdentifier(buttonID, "id", getPackageName());
                 buttons[i][j] = findViewById(resID);
+                // On attache le tag ici pour une utilisation facile dans onCellClick
+                buttons[i][j].setTag(i + "" + j);
             }
         }
     }
@@ -114,14 +153,13 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
 
-        // Si c'est le tour du bot, on ignore le clic (sécurité)
         if (isPvE) {
             boolean isBotTurn = (isPlayerXTurn && botSymbol.equals("X")) || (!isPlayerXTurn && botSymbol.equals("O"));
             if (isBotTurn) return;
         }
 
         Button b = (Button) v;
-        if (!b.getText().toString().isEmpty()) return; // Case déjà jouée
+        if (!b.getText().toString().isEmpty()) return;
 
         String tag = b.getTag().toString();
         int row = Character.getNumericValue(tag.charAt(0));
@@ -132,15 +170,14 @@ public class GameActivity extends AppCompatActivity {
 
     private void makeMove(int row, int col) {
         String symbol = isPlayerXTurn ? "X" : "O";
-        
-        // Set text and color
+
         buttons[row][col].setText(symbol);
         if (symbol.equals("X")) {
-            buttons[row][col].setTextColor(getResources().getColor(R.color.neon_pink));
+            buttons[row][col].setTextColor(getResources().getColor(R.color.neon_red)); // Modifié pour être cohérent avec le design
         } else {
             buttons[row][col].setTextColor(getResources().getColor(R.color.neon_blue));
         }
-        
+
         board[row][col] = symbol;
 
         if (checkForWin()) {
@@ -148,10 +185,9 @@ public class GameActivity extends AppCompatActivity {
         } else if (isBoardFull()) {
             handleEndPartie("NUL", false);
         } else {
-            isPlayerXTurn = !isPlayerXTurn; // Passer le tour
+            isPlayerXTurn = !isPlayerXTurn;
             updateStatus();
 
-            // Trigger bot move if applicable
             if (isPvE && !partieTerminee) {
                 boolean isBotTurn = (isPlayerXTurn && botSymbol.equals("X")) || (!isPlayerXTurn && botSymbol.equals("O"));
                 if (isBotTurn) {
@@ -170,25 +206,15 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private int[] getBestMove() {
-        // Facile: Aléatoire
         if (difficulty == 0) {
             return getRandomMove();
-        }
-        // Moyen: Bloquer ou Gagner ou Aléatoire
-        else if (difficulty == 1) {
-            // Tenter de gagner
+        } else if (difficulty == 1) {
             int[] winningMove = findWinningMove(botSymbol);
             if (winningMove != null) return winningMove;
-
-            // Bloquer l'adversaire
             int[] blockingMove = findWinningMove(userSymbol);
             if (blockingMove != null) return blockingMove;
-
             return getRandomMove();
-        }
-        // Difficile: Minimax
-        else {
-            // Optimisation pour le premier coup (le centre ou aléatoire) pour éviter un calcul inutile sur grille vide
+        } else {
             if (isEmptyBoard()) return getRandomMove();
             return minimaxRoot();
         }
@@ -213,10 +239,10 @@ public class GameActivity extends AppCompatActivity {
                 if (board[i][j].isEmpty()) {
                     board[i][j] = symbol;
                     if (checkForWin(symbol)) {
-                        board[i][j] = ""; // Backtrack
+                        board[i][j] = "";
                         return new int[]{i, j};
                     }
-                    board[i][j] = ""; // Backtrack
+                    board[i][j] = "";
                 }
             }
         }
@@ -230,47 +256,36 @@ public class GameActivity extends AppCompatActivity {
         return true;
     }
 
-    /** Vérifie si le joueur spécifié a gagné */
     private boolean checkForWin(String player) {
-        // Lignes
         for (int i = 0; i < 3; i++) {
             if (board[i][0].equals(player) && board[i][1].equals(player) && board[i][2].equals(player)) return true;
         }
-        // Colonnes
         for (int i = 0; i < 3; i++) {
             if (board[0][i].equals(player) && board[1][i].equals(player) && board[2][i].equals(player)) return true;
         }
-        // Diagonales
         if (board[0][0].equals(player) && board[1][1].equals(player) && board[2][2].equals(player)) return true;
         if (board[0][2].equals(player) && board[1][1].equals(player) && board[2][0].equals(player)) return true;
         return false;
     }
 
-    /** Vérifie s'il y a un gagnant (pour la logique de jeu principale) */
     private boolean checkForWin() {
         String s;
         for (int i = 0; i < 3; i++) {
-            // Lignes
             s = board[i][0];
             if (s != null && !s.isEmpty() && s.equals(board[i][1]) && s.equals(board[i][2])) return true;
-            // Colonnes
             s = board[0][i];
             if (s != null && !s.isEmpty() && s.equals(board[1][i]) && s.equals(board[2][i])) return true;
         }
-        // Diagonales
         s = board[0][0];
         if (s != null && !s.isEmpty() && s.equals(board[1][1]) && s.equals(board[2][2])) return true;
         s = board[0][2];
         if (s != null && !s.isEmpty() && s.equals(board[1][1]) && s.equals(board[2][0])) return true;
-
         return false;
     }
 
-    // --- Minimax Algorithm ---
     private int[] minimaxRoot() {
         int bestScore = Integer.MIN_VALUE;
         int[] bestMove = null;
-
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 if (board[i][j].isEmpty()) {
@@ -336,9 +351,16 @@ public class GameActivity extends AppCompatActivity {
         if (isWin) {
             textStatus.setText("Victoire de " + result + "!");
             if (result.equals("X")) scoreX++; else scoreO++;
+
+            boolean userWon = isPvE ? result.equals(userSymbol) : true;
+            //showAvatar(userWon);
+            playSound(userWon ? "win" : "lose");
+
         } else {
             textStatus.setText("Match nul.");
             partiesNulles++;
+            //showAvatar(false); // Can be a draw avatar if you want
+            playSound("draw");
         }
         updateUI();
 
@@ -346,6 +368,34 @@ public class GameActivity extends AppCompatActivity {
             new Handler(Looper.getMainLooper()).postDelayed(this::nextPartie, 2000);
         } else {
             new Handler(Looper.getMainLooper()).postDelayed(this::endTournament, 2000);
+        }
+    }
+
+    //private void showAvatar(boolean didWin) {
+      //  if (imageAvatarStatus != null) {
+        //    if (didWin) {
+          //      imageAvatarStatus.setImageResource(R.drawable.win_avatar);
+            //} else {
+              //  imageAvatarStatus.setImageResource(R.drawable.lose_avatar);
+            //}
+            //imageAvatarStatus.setVisibility(View.VISIBLE);
+        //}
+    //}
+
+    private void playSound(String sound) {
+        if (soundsLoaded) {
+            float volume = 1.0f;
+            switch (sound) {
+                case "win":
+                    soundPool.play(winSoundId, volume, volume, 1, 0, 1.0f);
+                    break;
+                case "lose":
+                    soundPool.play(loseSoundId, volume, volume, 1, 0, 1.0f);
+                    break;
+                case "draw":
+                    soundPool.play(drawSoundId, volume, volume, 1, 0, 1.0f);
+                    break;
+            }
         }
     }
 
@@ -357,18 +407,20 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void resetBoard() {
+        if (imageAvatarStatus != null) {
+            imageAvatarStatus.setVisibility(View.GONE);
+        }
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 board[i][j] = "";
                 buttons[i][j].setText("");
             }
         }
-        isPlayerXTurn = true; // X commence toujours
+        isPlayerXTurn = true;
         updateStatus();
 
-        // Si c'est au tour du bot (PvE et Bot est X)
         if (isPvE && botSymbol.equals("X")) {
-             new Handler(Looper.getMainLooper()).postDelayed(this::playBotMove, 500);
+            new Handler(Looper.getMainLooper()).postDelayed(this::playBotMove, 500);
         }
     }
 
@@ -400,7 +452,9 @@ public class GameActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Résultat du Tournoi")
-                .setMessage(winnerMessage + "\nScore X: " + scoreX + ", Score O: " + scoreO + ", Nulles: " + partiesNulles)
+                // ----- LIGNE CORRIGÉE -----
+                // J'ai mis toute la chaîne sur une seule ligne et utilisé "\n" pour le saut de ligne
+                .setMessage(winnerMessage + "\n\nScore X: " + scoreX + ", Score O: " + scoreO + ", Nulles: " + partiesNulles)
                 .setPositiveButton("Sauvegarder", (dialog, which) -> saveTournamentResults(vainqueur))
                 .setNegativeButton("Accueil", (dialog, which) -> goToHome())
                 .setCancelable(false)
@@ -430,5 +484,14 @@ public class GameActivity extends AppCompatActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
         finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
     }
 }

@@ -26,19 +26,27 @@
         <item name="android:translationZ">4dp</item>
         <item name="android:stateListAnimator">@null</item>
     </style>
-    
+
     <style name="GridButton" parent="Widget.AppCompat.Button">
-        <item name="android:layout_width">90dp</item>
-        <item name="android:layout_height">90dp</item>
+        <item name="android:layout_width">100dp</item>
+        <item name="android:layout_height">100dp</item>
         <item name="android:layout_margin">6dp</item>
-        <item name="android:background">@drawable/neon_border_bg</item>
-        <item name="android:textSize">50sp</item>
-        <item name="android:textColor">@color/neon_pink</item>
+
+        <!-- Fond de la case utilisant le style néon que nous avons créé -->
+        <item name="android:background">@drawable/style_case_neon</item>
+
+        <!-- Taille du texte augmentée pour une meilleure visibilité -->
+        <item name="android:textSize">60sp</item>
+
+        <!-- La couleur du texte sera définie dynamiquement en Java, mais on peut mettre une couleur par défaut -->
+        <item name="android:textColor">@color/white</item>
+
         <item name="android:textStyle">bold</item>
         <item name="android:elevation">6dp</item>
         <item name="android:stateListAnimator">@null</item>
     </style>
-    
+
+
     <style name="FloatingCard">
         <item name="android:background">@drawable/card_bg</item>
         <item name="android:elevation">12dp</item>

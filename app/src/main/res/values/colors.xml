@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Couleurs de base -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="neon_blue">#00FFFF</color>
-    <color name="neon_pink">#FF00FF</color>
-    <color name="neon_green">#39FF14</color>
-    <color name="background_dark">#121212</color>
-    <color name="button_bg">#1E1E1E</color>
-    <color name="text_color_primary">#FFFFFF</color>
+
+    <!-- Palette du design Néon -->
+    <color name="background_dark">#1A1433</color> <!-- Fond principal, un violet très sombre -->
+    <color name="button_bg">#2C2A4A</color> <!-- Fond pour les boutons et autres éléments -->
+    <color name="neon_blue">#00C2FF</color>
+    <color name="neon_red">#FF1B6B</color><!-- Bleu vif pour les 'X' ou les boutons -->
+    <color name="neon_pink">#FF1B6B</color>               <!-- Rouge/Rose vif pour les 'O' -->
+    <color name="neon_green">#39FF14</color>            <!-- Vert néon pour les boutons -->
+    <color name="text_color_primary">#FFFFFF</color>     <!-- Couleur de texte principale -->
+
 </resources>
